@@ -1,42 +1,3 @@
-// Splash Screen Scene
-class SplashScene extends Phaser.Scene {
-  constructor() {
-      super({ key: 'SplashScene' });
-  }
-
-  preload() {
-      this.load.image('logo', 'assets/logo.png'); // Using assets/ path
-      this.load.image('startButton', 'assets/startButton.png'); // Using assets/ path
-  }
-
-  create() {
-      // Add gradient background
-      this.createGradientBackground();
-
-      // Add logo image
-      let logo = this.add.image(400, 200, 'logo');
-      logo.setScale(0.5); // Adjust scale as needed
-
-      // Add start button
-      let startButton = this.add.image(400, 400, 'startButton');
-      startButton.setInteractive();
-
-      // Start the main game when the button is clicked
-      startButton.on('pointerdown', () => {
-          this.scene.start('MainScene'); // Switch to the main game scene
-      });
-  }
-
-  // Function to create the gradient background
-  createGradientBackground() {
-      let graphics = this.add.graphics();
-
-      // Create a vertical gradient (top to bottom) using fillGradientStyle
-      graphics.fillGradientStyle(0xfba65a, 0xffcb6b, 0xff8f50, 0xff7591, 1);
-      graphics.fillRect(0, 0, 800, 600); // Cover the entire screen
-  }
-}
-
 // Main Game Scene
 class MainScene extends Phaser.Scene {
   constructor() {
@@ -44,9 +5,10 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-      this.load.image('clam', 'assets/clam.png'); // Using assets/ path
-      this.load.image('beaver', 'assets/beaver.png'); // Using assets/ path
-      this.load.image('stone', 'assets/stone.png'); // Using assets/ path
+      this.load.image('clamBottom', 'assets/clam-bottom.png'); // Bottom clam image
+      this.load.image('clamTop', 'assets/clam-top.png');       // Top clam image
+      this.load.image('beaver', 'assets/beaver.png');          // Beaver image
+      this.load.image('stone', 'assets/stone.png');            // Stone image
   }
 
   create() {
@@ -56,16 +18,19 @@ class MainScene extends Phaser.Scene {
       // Add gradient background in the main game scene
       this.createGradientBackground();
 
-      // Add the clam (player's object)
-      this.clam = this.physics.add.sprite(400, 550, 'clam').setCollideWorldBounds(true);
+      // Add the bottom clam with physics, always visible
+      this.clamBottom = this.physics.add.sprite(400, 550, 'clamBottom').setCollideWorldBounds(true);
+
+      // Add the top clam with physics, positioned on top of the bottom clam
+      this.clamTop = this.physics.add.sprite(400, 520, 'clamTop').setCollideWorldBounds(true);
 
       // Create groups for beavers and stones
       this.beaverGroup = this.physics.add.group();
       this.stoneGroup = this.physics.add.group();
 
-      // Add collider between clam and the objects
-      this.physics.add.overlap(this.clam, this.beaverGroup, this.catchBeaver, null, this);
-      this.physics.add.overlap(this.clam, this.stoneGroup, this.catchStone, null, this);
+      // Add collider between the top clam and the objects
+      this.physics.add.overlap(this.clamTop, this.beaverGroup, this.catchBeaver, null, this);
+      this.physics.add.overlap(this.clamTop, this.stoneGroup, this.catchStone, null, this);
 
       // Display score
       this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#000' });
@@ -85,14 +50,20 @@ class MainScene extends Phaser.Scene {
   update() {
       if (this.gameOver) return;
 
-      // Move the clam left and right with arrow keys (speed changed to 350)
+      // Move both clam parts left and right with the same velocity
       if (this.cursors.left.isDown) {
-          this.clam.setVelocityX(-350);
+          this.clamBottom.setVelocityX(-350);
+          this.clamTop.setVelocityX(-350);
       } else if (this.cursors.right.isDown) {
-          this.clam.setVelocityX(350);
+          this.clamBottom.setVelocityX(350);
+          this.clamTop.setVelocityX(350);
       } else {
-          this.clam.setVelocityX(0);
+          this.clamBottom.setVelocityX(0);
+          this.clamTop.setVelocityX(0);
       }
+
+      // Keep the top clam aligned with the bottom clam when moving
+      this.clamTop.x = this.clamBottom.x;
   }
 
   // Function to create the gradient background
@@ -118,17 +89,26 @@ class MainScene extends Phaser.Scene {
   }
 
   // Function when a beaver is caught
-  catchBeaver(clam, beaver) {
+  catchBeaver(clamTop, beaver) {
       beaver.destroy();
       this.score += 1;
       this.scoreText.setText('Score: ' + this.score);
+
+      // Rotate the top clam 90 degrees clockwise (to look like it's open)
+      this.clamTop.setAngle(90);
+
+      // Switch back to closed clam position after a short delay (500ms)
+      this.time.delayedCall(500, () => {
+          this.clamTop.setAngle(0); // Reset the top clam back to its original state
+      }, [], this);
   }
 
   // Function when a stone is caught (game over)
-  catchStone(clam, stone) {
+  catchStone(clamTop, stone) {
       stone.destroy();
       this.physics.pause();
-      this.clam.setTint(0xff0000);  // Red tint to indicate game over
+      this.clamBottom.setTint(0xff0000);  // Red tint to indicate game over
+      this.clamTop.setTint(0xff0000);     // Red tint to indicate game over
       this.gameOver = true;
       this.spawnTimer.remove(); // Stop the spawn timer when the game is over
       this.scoreText.setText('Game Over! Final Score: ' + this.score);
@@ -147,7 +127,7 @@ let config = {
           debug: false
       }
   },
-  scene: [SplashScene, MainScene] // Add multiple scenes to handle the splash and main game
+  scene: [MainScene] // Use only the main game scene
 };
 
 let game = new Phaser.Game(config);
